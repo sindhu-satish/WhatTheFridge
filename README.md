@@ -1,22 +1,17 @@
 # WhatTheFridge - AI Ingredient Detection API
 
-This backend API uses computer vision AI models to identify ingredients in fridge images and estimate their quantities.
+This backend API uses OpenAI's Vision API to identify ingredients in fridge images and estimate their quantities.
 
 ## Features
 
 - Image upload endpoint to analyze fridge contents
-- Advanced ingredient detection with specific quantity estimates (e.g., "3 apples", "500ml milk")
-- Object counting for discrete items (e.g., fruits, eggs)
-- Depth estimation for more accurate volume/weight measurement of continuous items (cheese, liquids)
-- Support for both local models and OpenAI Vision API
-- Configurable model selection
+- Accurate ingredient detection with specific quantity estimates (e.g., "3 apples", "500ml milk")
+- Powered by OpenAI's GPT-4 Vision API for state-of-the-art food recognition
 
 ## Technology Stack
 
 - FastAPI for the API framework
-- Hugging Face Transformers for local AI models
-- MiDaS for monocular depth estimation
-- Optional integration with OpenAI's GPT-4 Vision API
+- OpenAI's GPT-4 Vision API for food recognition
 - Python 3.8+ runtime
 
 ## Setup
@@ -31,23 +26,13 @@ pip install -r requirements.txt
 # API Configuration
 PORT=8000
 
-# Model Selection (local, openai)
-MODEL_TYPE=local
-
-# Enable/disable depth estimation for better volume measurement
-USE_DEPTH_ESTIMATION=true
-
-# OpenAI Configuration (only needed if MODEL_TYPE=openai)
-USE_OPENAI=false
-OPENAI_API_KEY=
-```
-
-4. If you want to use OpenAI's Vision API, update the `.env` file:
-```
-MODEL_TYPE=openai
-USE_OPENAI=true
+# OpenAI API Configuration (REQUIRED)
 OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4-vision-preview
+MAX_TOKENS=1000
 ```
+
+4. Make sure to add your actual OpenAI API key in the `.env` file.
 
 ## Running the API
 
@@ -58,16 +43,6 @@ python app.py
 ```
 
 The API will be available at `http://localhost:8000`.
-
-## How It Works
-
-The API uses three key technologies to provide accurate ingredient recognition and quantity estimation:
-
-1. **Object Detection**: Identifies food items and their boundaries in the image
-2. **Object Counting**: Counts discrete items (like apples or eggs) by analyzing bounding boxes
-3. **Depth Estimation**: Uses the MiDaS model to estimate the depth/volume of continuous items (like liquids or cheese)
-
-This combination allows for more precise estimates than just using bounding box sizes alone.
 
 ## API Endpoints
 
@@ -87,27 +62,31 @@ Example response:
       "name": "apple",
       "confidence": 0.95,
       "estimated_quantity": "3 apples",
-      "box_coordinates": [100, 200, 300, 400]
+      "box_coordinates": [0, 0, 100, 100]
     },
     {
       "name": "milk",
       "confidence": 0.87,
       "estimated_quantity": "1.0 liter",
-      "box_coordinates": [50, 100, 150, 300]
+      "box_coordinates": [0, 0, 100, 100]
     },
     {
       "name": "cheese",
       "confidence": 0.92,
       "estimated_quantity": "250g",
-      "box_coordinates": [200, 150, 300, 250]
+      "box_coordinates": [0, 0, 100, 100]
     }
   ],
-  "model_used": "local_huggingface_models",
-  "depth_estimation_used": true
+  "model_used": "gpt-4-vision-preview"
 }
 ```
 
-## Notes on Model Selection
+## Testing with cURL
 
-- **Local Model**: Uses Hugging Face's pre-trained object detection and classification models combined with MiDaS depth estimation. Faster but less accurate for complex food identification.
-- **OpenAI Model**: Uses GPT-4 Vision API. More accurate but requires an API key and internet connection. 
+You can test the API using cURL:
+
+```bash
+curl -X POST -F "image=@/path/to/your/image.jpg" http://localhost:8000/analyze-image
+```
+
+Replace `/path/to/your/image.jpg` with the path to an actual image file. 

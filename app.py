@@ -4,6 +4,7 @@ import uvicorn
 from services.image_analysis import analyze_image
 import os
 from dotenv import load_dotenv
+import traceback
 
 # Load environment variables
 load_dotenv()
@@ -42,7 +43,13 @@ async def analyze_fridge_image(image: UploadFile = File(...)):
         results = analyze_image(contents)
         return results
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to analyze image: {str(e)}")
+        error_msg = str(e)
+        if "OpenAI API key is not set" in error_msg:
+            raise HTTPException(status_code=500, detail="OpenAI API key is not configured. Please set OPENAI_API_KEY in the .env file.")
+        else:
+            print(f"Error analyzing image: {error_msg}")
+            print(traceback.format_exc())
+            raise HTTPException(status_code=500, detail=f"Failed to analyze image: {error_msg}")
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
