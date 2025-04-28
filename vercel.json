@@ -1,15 +1,29 @@
 {
   "version": 2,
+  "buildCommand": "cd UI && npm install && npm run build && cd .. && chmod +x build.sh && ./build.sh",
+  "outputDirectory": "UI/dist",
   "builds": [
     {
       "src": "app.py",
-      "use": "@vercel/python"
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb",
+        "runtime": "python3.9"
+      }
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/api/analyze-image",
       "dest": "app.py"
+    },
+    {
+      "src": "/api(.*)",
+      "dest": "app.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "UI/dist/$1"
     }
   ]
 } 

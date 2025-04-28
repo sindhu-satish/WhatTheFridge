@@ -1,14 +1,5 @@
 fastapi
 uvicorn
-python-multipart
-pillow
-numpy
-transformers
-torch
+opencv-python
 python-dotenv
 requests
-opencv-python
-timm
-scipy
-torchvision
-ultralytics

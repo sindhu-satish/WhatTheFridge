@@ -1,7 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from services.image_analysis import analyze_image
 import os
 from dotenv import load_dotenv
 import traceback
@@ -19,6 +18,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Move the heavy import inside the function that uses it to enable lazy loading
+# This helps reduce the cold start time and initial memory footprint
+# from services.image_analysis import analyze_image
 
 @app.get("/")
 async def root():
@@ -43,6 +46,9 @@ async def analyze_fridge_image(image: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Uploaded file must be an image")
     
     try:
+        # Lazy import to reduce cold start time
+        from services.image_analysis import analyze_image
+        
         contents = await image.read()
         results = analyze_image(contents)
         return results

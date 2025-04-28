@@ -10,7 +10,7 @@ import time
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # Use a smaller model
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "1000"))
 USE_FAKE_RESPONSE = os.getenv("USE_FAKE_RESPONSE", "false").lower() == "true"
 
@@ -79,157 +79,83 @@ def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
         "Authorization": f"Bearer {OPENAI_API_KEY}"
     }
     
-    # Explicitly instruct the model to return JSON
-    prompt = (
-        "You are an expert food recognition system. Analyze this image of food items or a fridge interior. "
-        "Identify all food ingredients visible in the image. For each ingredient, provide: "
-        "1) the name of the ingredient (be specific), "
-        "2) an estimated specific quantity (e.g., '3 apples', '500ml milk', '250g cheese'), and "
-        "3) a confidence score from 0 to 1 representing how certain you are about this item. "
-        "\n\nYou MUST respond with a valid JSON object with an array called 'ingredients' where each item has "
-        "fields 'name', 'estimated_quantity', and 'confidence'. Be precise with the quantities - use counts "
-        "for discrete items, volume (ml, liters) for liquids, and weight (g, kg) for solid foods."
-        "\n\nIf the image is not clear or doesn't contain food, include an 'error' field in your JSON response."
-        "\n\nYOUR ENTIRE RESPONSE MUST BE VALID JSON WITHOUT ANY ADDITIONAL TEXT."
-    )
-    
-    # Use the new responses API format
+    # Simplified API call using the vision endpoint
     payload = {
         "model": OPENAI_MODEL,
-        "input": [
+        "messages": [
             {
                 "role": "user",
                 "content": [
                     {
-                        "type": "input_text", 
-                        "text": prompt
+                        "type": "text", 
+                        "text": "Identify food items in this image. Return a JSON with array 'ingredients' containing objects with 'name', 'estimated_quantity', and 'confidence' fields."
                     },
                     {
-                        "type": "input_image",
-                        "image_url": f"data:image/jpeg;base64,{base64_image}"
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}"
+                        }
                     }
                 ]
             }
-        ]
+        ],
+        "max_tokens": MAX_TOKENS
     }
     
     try:
-        # Print debugging info
-        print(f"Calling OpenAI API with model: {OPENAI_MODEL}")
-        print(f"API URL: https://api.openai.com/v1/responses")
-        print(f"API key length: {len(OPENAI_API_KEY)} characters")
+        # Simple POST request with minimal retries
+        response = requests.post(
+            "https://api.openai.com/v1/chat/completions", 
+            headers=headers, 
+            json=payload,
+            timeout=30
+        )
         
-        # Add a retry mechanism
-        max_retries = 3
-        retry_delay = 2  # seconds
-        
-        for attempt in range(max_retries):
-            try:
-                response = requests.post(
-                    "https://api.openai.com/v1/responses", 
-                    headers=headers, 
-                    json=payload,
-                    timeout=30  # Add timeout
-                )
-                
-                # Print response for debugging
-                print(f"Response status code: {response.status_code}")
-                print(f"Response content: {response.text[:300]}...")  # Print first 300 chars
-                
-                # Check for rate limiting
-                if response.status_code == 429:
-                    print(f"Rate limited. Attempt {attempt+1}/{max_retries}. Waiting {retry_delay} seconds.")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-                    continue
-                    
-                # Break on other status codes
-                break
-                    
-            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-                print(f"Connection error on attempt {attempt+1}/{max_retries}: {str(e)}")
-                if attempt < max_retries - 1:
-                    time.sleep(retry_delay)
-                    retry_delay *= 2
-                else:
-                    raise
-        
-        # Process response
         if response.status_code == 200:
-            response_data = response.json()
+            result = response.json()
             
-            # Debug the response structure
-            print(f"Response data keys: {response_data.keys()}")
-            
-            # Check if the response has the expected structure
-            if "content" in response_data and isinstance(response_data["content"], list) and len(response_data["content"]) > 0:
-                response_text = response_data["content"][0].get("text", "")
-                print(f"Extracted text: {response_text[:100]}...")  # Print first 100 chars
-            else:
-                # Fall back to the raw response if the structure is unexpected
-                print("Unexpected response structure, using raw response")
-                response_text = json.dumps(response_data)
-            
-            # Try to extract JSON using regex (in case the model outputs additional text)
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                try:
-                    json_str = json_match.group(0)
-                    print(f"Extracted JSON: {json_str[:100]}...")  # Print first 100 chars
-                    result = json.loads(json_str)
-                    result["model_used"] = OPENAI_MODEL
-                    
-                    # Add default coordinates for visualization purposes
-                    for item in result.get("ingredients", []):
-                        if "box_coordinates" not in item:
-                            item["box_coordinates"] = [0, 0, 100, 100]  # Dummy coordinates
-                    
-                    return result
-                except json.JSONDecodeError as e:
-                    print(f"Failed to parse JSON from regex match: {str(e)}")
-            
-            # If JSON extraction failed, try parsing the whole response
             try:
-                result = json.loads(response_text)
-                result["model_used"] = OPENAI_MODEL
-                return result
-            except json.JSONDecodeError as e:
-                print(f"Failed to parse JSON from whole response: {str(e)}")
+                # Extract the content from the response
+                content = result["choices"][0]["message"]["content"]
                 
-                # Fall back to the fake response but include details about the error
-                fake_response = get_fake_response()
-                fake_response["error"] = "Failed to parse OpenAI response as JSON"
-                fake_response["raw_response"] = response_text[:500]  # Include part of the raw response
-                return fake_response
+                # Try to parse JSON from the content
+                json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    parsed_json = json.loads(json_str)
+                    parsed_json["model_used"] = OPENAI_MODEL
+                    return parsed_json
+                else:
+                    try:
+                        parsed_json = json.loads(content)
+                        parsed_json["model_used"] = OPENAI_MODEL
+                        return parsed_json
+                    except:
+                        pass
+            except:
+                pass
+            
+            # If all parsing attempts fail, return a fallback response
+            return {
+                "ingredients": [],
+                "error": "Failed to parse OpenAI response",
+                "model_used": OPENAI_MODEL
+            }
         else:
             # Handle error response
-            error_message = f"OpenAI API returned status code {response.status_code}"
-            try:
-                error_data = response.json()
-                print(f"Error data: {error_data}")
-                error_detail = error_data.get("error", {}).get("message", "Unknown error")
-                error_message = f"{error_message}: {error_detail}"
-            except:
-                error_message = f"{error_message}: {response.text}"
-            
-            print(f"API Error: {error_message}")
-            
-            # Return fake response for testing to avoid blocking development
-            print("Returning fake test response due to API error")
-            fake_response = get_fake_response()
-            fake_response["error"] = error_message
-            return fake_response
+            return {
+                "ingredients": [],
+                "error": f"OpenAI API error: {response.status_code}",
+                "model_used": "error"
+            }
     
     except Exception as e:
-        # Handle request errors (network issues, API errors, etc.)
-        error_msg = f"Error making API request: {str(e)}"
-        print(f"Exception: {error_msg}")
-        
-        # Return fake response for testing
-        print("Returning fake test response due to exception")
-        fake_response = get_fake_response()
-        fake_response["error"] = error_msg
-        return fake_response
+        # Handle request errors
+        return {
+            "ingredients": [],
+            "error": f"Request error: {str(e)}",
+            "model_used": "error"
+        }
 
 def analyze_image(image_bytes: bytes) -> Dict[str, Any]:
     """
@@ -241,4 +167,9 @@ def analyze_image(image_bytes: bytes) -> Dict[str, Any]:
     Returns:
         Dictionary with detected ingredients and quantities
     """
+    # Return fake response in development to avoid API costs
+    if os.environ.get("VERCEL_ENV") != "production":
+        print("Using fake response in development environment")
+        return get_fake_response()
+        
     return analyze_image_with_openai(image_bytes) 
