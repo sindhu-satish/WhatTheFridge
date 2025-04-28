@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
 from dotenv import load_dotenv
@@ -9,6 +10,9 @@ import traceback
 load_dotenv()
 
 app = FastAPI(title="WhatTheFridge API")
+
+# Mount static files
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 # Configure CORS
 app.add_middleware(

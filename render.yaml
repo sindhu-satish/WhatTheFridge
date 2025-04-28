@@ -1,8 +1,9 @@
 services:
   - type: web
-    name: whatthefridge-api
+    name: whatthefridge
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      cd UI && npm install && npm run build && cd .. && mkdir -p static && cp -r UI/dist/* static/ && pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: OPENAI_API_KEY
@@ -11,3 +12,5 @@ services:
         value: false
       - key: OPENAI_MODEL
         value: gpt-4.1
+      - key: NODE_VERSION
+        value: 18.17.0
