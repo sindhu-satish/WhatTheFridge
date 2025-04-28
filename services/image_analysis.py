@@ -10,7 +10,7 @@ import time
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # Use a smaller model
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1")
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "1000"))
 USE_FAKE_RESPONSE = os.getenv("USE_FAKE_RESPONSE", "false").lower() == "true"
 
