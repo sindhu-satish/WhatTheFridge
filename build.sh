@@ -2,7 +2,7 @@
 set -e
 
 cd UI
-npm install
+npm install --include=dev
 npm run build
 cd ..
 
