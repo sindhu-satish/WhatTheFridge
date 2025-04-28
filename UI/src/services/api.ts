@@ -1,7 +1,9 @@
 // API service for WhatTheFridge
 
 // Use an external API URL in production, and local development server for testing
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = process.env.NODE_ENV === 'production' 
+  ? window.location.origin  // Use the same origin as the frontend
+  : 'http://localhost:8000';
 
 export interface Ingredient {
   name: string;
