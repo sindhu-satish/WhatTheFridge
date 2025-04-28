@@ -6,6 +6,10 @@ from dotenv import load_dotenv
 import json
 import re
 import time
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -45,20 +49,45 @@ def get_fake_response() -> Dict[str, Any]:
         "model_used": "fake_response_for_testing"
     }
 
+def extract_json_from_markdown(content: str) -> Dict[str, Any]:
+    """
+    Extract JSON from markdown code blocks.
+    Args:
+        content: String containing markdown with JSON code block
+    Returns:
+        Parsed JSON object
+    """
+    content = content.strip()
+    if content.startswith('```json'):
+        content = content[7:]  
+    if content.startswith('```'):
+        content = content[3:]  
+    if content.endswith('```'):
+        content = content[:-3] 
+    
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON from markdown: {e}")
+        return {"ingredients": [], "error": "Failed to parse JSON response"}
+
 def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
+    logger.debug("Starting image analysis")
+    
     if USE_FAKE_RESPONSE:
         print("Using fake response for testing (USE_FAKE_RESPONSE=true)")
         return get_fake_response()
     
-    if not OPENAI_API_KEY or OPENAI_API_KEY == "your_openai_api_key_here":
-        print("OpenAI API key is not properly set")
+    if not OPENAI_API_KEY:
+        logger.error("OpenAI API key is not set")
         return {
-            "error": "OpenAI API key is not set. Please set the OPENAI_API_KEY environment variable.",
             "ingredients": [],
-            "model_used": "error"
+            "model_used": "error",
+            "error": "OpenAI API key is not set"
         }
     
     base64_image = base64.b64encode(image_bytes).decode('utf-8')
+    logger.debug("Image converted to base64")
     
     headers = {
         "Content-Type": "application/json",
@@ -72,8 +101,8 @@ def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
                 "role": "user",
                 "content": [
                     {
-                        "type": "text", 
-                        "text": "Identify food items in this image. Return a JSON with array 'ingredients' containing objects with 'name', 'estimated_quantity', and 'confidence' fields."
+                        "type": "text",
+                        "text": "Analyze this image of food items. For each food item you detect, provide:\n1. The name of the food item\n2. An estimated quantity (e.g., '2 apples', '1 liter of milk')\n3. Your confidence level in the detection (0-1)\n\nFormat the response as a JSON object with an 'ingredients' array. Each ingredient should have 'name', 'estimated_quantity', and 'confidence' fields."
                     },
                     {
                         "type": "image_url",
@@ -87,52 +116,46 @@ def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
         "max_tokens": MAX_TOKENS
     }
     
+    logger.debug(f"Using OpenAI model: {OPENAI_MODEL}")
+    
     try:
+        logger.debug("Making request to OpenAI API")
         response = requests.post(
-            "https://api.openai.com/v1/chat/completions", 
-            headers=headers, 
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
             json=payload,
             timeout=30
         )
         
+        logger.debug(f"OpenAI API response status code: {response.status_code}")
+        
         if response.status_code == 200:
             result = response.json()
+            logger.debug("Successfully received JSON response from OpenAI")
+            content = result["choices"][0]["message"]["content"]
+            logger.debug(f"OpenAI response content: {content}")
             
-            try:
-                content = result["choices"][0]["message"]["content"]
-                json_match = re.search(r'\{.*\}', content, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group(0)
-                    parsed_json = json.loads(json_str)
-                    parsed_json["model_used"] = OPENAI_MODEL
-                    return parsed_json
-                else:
-                    try:
-                        parsed_json = json.loads(content)
-                        parsed_json["model_used"] = OPENAI_MODEL
-                        return parsed_json
-                    except:
-                        pass
-            except:
-                pass
-            
-            return {
-                "ingredients": [],
-                "error": "Failed to parse OpenAI response",
-                "model_used": OPENAI_MODEL
-            }
+            parsed_response = extract_json_from_markdown(content)
+            parsed_response["model_used"] = OPENAI_MODEL
+            logger.debug("Successfully parsed response JSON")
+            return parsed_response
         else:
+            error_msg = f"OpenAI API error: {response.status_code}"
+            if response.text:
+                error_msg += f" - {response.text}"
+            logger.error(error_msg)
             return {
                 "ingredients": [],
-                "error": f"OpenAI API error: {response.status_code}",
-                "model_used": "error"
+                "model_used": "error",
+                "error": error_msg
             }
-    
+            
     except Exception as e:
+        logger.error(f"Exception during API call: {str(e)}")
         return {
             "ingredients": [],
-            "error": f"Request error: {str(e)}",
-            "model_used": "error"
+            "model_used": "error",
+            "error": str(e)
         }
 
 def analyze_image(image_bytes: bytes) -> Dict[str, Any]:

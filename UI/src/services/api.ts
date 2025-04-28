@@ -1,4 +1,3 @@
-
 const BASE_URL = 'http://0.0.0.0:8000/api';
 
 export interface Ingredient {
@@ -10,16 +9,11 @@ export interface Ingredient {
 
 export interface AnalysisResponse {
   ingredients: Ingredient[];
-  model_used?: string;
+  model_name?: string;
   error?: string;
 }
 
-/**
- * Analyze an image of food/fridge contents
- * 
- * @param imageFile - The image file to analyze
- * @returns Promise with analysis results
- */
+
 export async function analyzeImage(imageFile: File): Promise<AnalysisResponse> {
   const formData = new FormData();
   formData.append('image', imageFile);

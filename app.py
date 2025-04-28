@@ -8,6 +8,8 @@ import shutil
 from datetime import datetime
 import uuid
 from typing import List, Optional
+from pydantic import BaseModel, ConfigDict
+import uvicorn
 
 app = FastAPI()
 
@@ -26,19 +28,21 @@ os.makedirs(IMAGES_DIR, exist_ok=True)
 async def health_check():
     return {"status": "healthy", "message": "WhatTheFridge API is running"}
 
-class Ingredient:
+class Ingredient(BaseModel):
     name: str
     estimated_quantity: str
     confidence: float
-    box_coordinates: Optional[List[float]]
+    box_coordinates: Optional[List[float]] = None
 
-class AnalysisResponse:
+class AnalysisResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+    
     ingredients: List[Ingredient]
-    model_used: Optional[str]
-    error: Optional[str]
+    model_used: Optional[str] = None
+    error: Optional[str] = None
 
-@app.post("/api/analyze-image")
-async def analyze_image(image: UploadFile = File(...)) -> AnalysisResponse:
+@app.post("/api/analyze-image", response_model=AnalysisResponse)
+async def analyze_image(image: UploadFile = File(...)):
     try:
         if not image.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="File must be an image")
@@ -57,21 +61,24 @@ async def analyze_image(image: UploadFile = File(...)) -> AnalysisResponse:
         
         result = analyze_image_with_openai(image_bytes)
         
-        response = {
-            "ingredients": result.get("ingredients", []),
-            "model_used": result.get("model_used"),
-            "error": None
-        }
+        response = AnalysisResponse(
+            ingredients=result.get("ingredients", []),
+            model_used=result.get("model_used"),
+            error=None
+        )
         
-        return JSONResponse(content=response)
+        return response
     
     except Exception as e:
         print(f"Error processing image: {str(e)}")
-        error_response = {
-            "ingredients": [],
-            "model_used": None,
-            "error": str(e)
-        }
-        raise HTTPException(status_code=500, detail=error_response)
+        error_response = AnalysisResponse(
+            ingredients=[],
+            model_used=None,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=error_response.dict())
 
-app.mount("/", StaticFiles(directory="UI/dist", html=True), name="ui") 
+app.mount("/", StaticFiles(directory="UI/dist", html=True), name="ui")
+
+if __name__ == "__main__":
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True) 
