@@ -24,6 +24,10 @@ app.add_middleware(
 async def root():
     return {"message": "WhatTheFridge API is running"}
 
+@app.get("/api")
+async def api_root():
+    return {"message": "WhatTheFridge API is running"}
+
 @app.post("/analyze-image")
 async def analyze_fridge_image(image: UploadFile = File(...)):
     """
@@ -50,6 +54,11 @@ async def analyze_fridge_image(image: UploadFile = File(...)):
             print(f"Error analyzing image: {error_msg}")
             print(traceback.format_exc())
             raise HTTPException(status_code=500, detail=f"Failed to analyze image: {error_msg}")
+
+@app.post("/api/analyze-image")
+async def api_analyze_fridge_image(image: UploadFile = File(...)):
+    """Alternative endpoint for Vercel compatibility"""
+    return await analyze_fridge_image(image)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
