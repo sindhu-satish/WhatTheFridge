@@ -23,8 +23,8 @@ app.add_middleware(
 IMAGES_DIR = "images"
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
-# Mount the UI directory
-app.mount("/", StaticFiles(directory="UI", html=True), name="ui")
+# Mount the built UI directory
+app.mount("/", StaticFiles(directory="UI/dist", html=True), name="ui")
 
 @app.post("/api/analyze-image")
 async def analyze_image(image: UploadFile = File(...)):
