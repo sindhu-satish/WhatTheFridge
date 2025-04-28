@@ -15,9 +15,6 @@ MAX_TOKENS = int(os.getenv("MAX_TOKENS", "1000"))
 USE_FAKE_RESPONSE = os.getenv("USE_FAKE_RESPONSE", "false").lower() == "true"
 
 def get_fake_response() -> Dict[str, Any]:
-    """
-    Generate a fake response for testing purposes when OpenAI API is not available
-    """
     return {
         "ingredients": [
             {
@@ -49,16 +46,6 @@ def get_fake_response() -> Dict[str, Any]:
     }
 
 def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
-    """
-    Analyze an image using OpenAI's Vision API to identify ingredients and their quantities
-    
-    Args:
-        image_bytes: Raw bytes of the uploaded image
-        
-    Returns:
-        Dictionary with detected ingredients and their quantities
-    """
-    # Return fake response if requested (for testing without API access)
     if USE_FAKE_RESPONSE:
         print("Using fake response for testing (USE_FAKE_RESPONSE=true)")
         return get_fake_response()
@@ -71,7 +58,6 @@ def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
             "model_used": "error"
         }
     
-    # Convert image to base64
     base64_image = base64.b64encode(image_bytes).decode('utf-8')
     
     headers = {
@@ -79,7 +65,6 @@ def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
         "Authorization": f"Bearer {OPENAI_API_KEY}"
     }
     
-    # Simplified API call using the vision endpoint
     payload = {
         "model": OPENAI_MODEL,
         "messages": [
@@ -103,7 +88,6 @@ def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
     }
     
     try:
-        # Simple POST request with minimal retries
         response = requests.post(
             "https://api.openai.com/v1/chat/completions", 
             headers=headers, 
@@ -115,10 +99,7 @@ def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
             result = response.json()
             
             try:
-                # Extract the content from the response
                 content = result["choices"][0]["message"]["content"]
-                
-                # Try to parse JSON from the content
                 json_match = re.search(r'\{.*\}', content, re.DOTALL)
                 if json_match:
                     json_str = json_match.group(0)
@@ -135,14 +116,12 @@ def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
             except:
                 pass
             
-            # If all parsing attempts fail, return a fallback response
             return {
                 "ingredients": [],
                 "error": "Failed to parse OpenAI response",
                 "model_used": OPENAI_MODEL
             }
         else:
-            # Handle error response
             return {
                 "ingredients": [],
                 "error": f"OpenAI API error: {response.status_code}",
@@ -150,7 +129,6 @@ def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
             }
     
     except Exception as e:
-        # Handle request errors
         return {
             "ingredients": [],
             "error": f"Request error: {str(e)}",
@@ -158,16 +136,6 @@ def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
         }
 
 def analyze_image(image_bytes: bytes) -> Dict[str, Any]:
-    """
-    Main function to analyze an image of food/fridge contents
-    
-    Args:
-        image_bytes: Raw bytes of the uploaded image
-        
-    Returns:
-        Dictionary with detected ingredients and quantities
-    """
-    # Return fake response in development to avoid API costs
     if os.environ.get("VERCEL_ENV") != "production":
         print("Using fake response in development environment")
         return get_fake_response()

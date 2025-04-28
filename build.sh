@@ -3,6 +3,7 @@ set -e
 
 cd UI
 npm install --include=dev
+npm install --save-dev @types/node
 npm run build
 cd ..
 
