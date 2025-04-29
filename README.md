@@ -1,118 +1,166 @@
 # WhatTheFridge - AI Ingredient Detection
 
-An AI-powered app that identifies ingredients in your fridge and estimates their quantities.
-
-## Project Structure
-
-- **UI**: React frontend with drag-and-drop image upload 
-- **API**: FastAPI backend powered by OpenAI's Vision API
+An AI-powered app that identifies ingredients in your fridge and estimates their quantities, then suggests recipes based on the available ingredients.
 
 ## Features
 
 - Image upload to analyze fridge contents
 - Accurate ingredient detection with specific quantity estimates (e.g., "3 apples", "500ml milk")
+- Recipe recommendations based on detected ingredients
 - Beautiful, responsive UI with real-time results
 - Powered by OpenAI's Vision API for state-of-the-art food recognition
 
 ## Technology Stack
 
+### Backend
 - FastAPI for the API framework
 - OpenAI's Vision API for food recognition
 - Python 3.9+ runtime
 
+### Frontend
+- Vite
+- React
+- Tailwind CSS
+- TypeScript
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+- Python 3.9 or higher
+- Node.js 18 or higher
+- npm 
+- Git
+
 ## Setup
 
-1. Clone the repository
-2. Install backend dependencies:
+### Quick Setup (Recommended)
+
+The easiest way to set up the project is by using the provided build script:
+
 ```bash
-pip install -r requirements.txt
+# Clone the repository
+git clone https://github.com/sindhu-satish/WhatTheFridge.git
+cd WhatTheFridge
+
+# Make the build script executable
+chmod +x build.sh
+
+# Run the build script
+./build.sh
 ```
-3. Install frontend dependencies:
+
+The build script will:
+- Create and activate a Python virtual environment
+- Install backend dependencies
+- Set up the .env file (you'll need to add your OpenAI API key)
+- Install frontend dependencies
+
+### Manual Setup
+
+If you prefer to set up manually, follow these steps:
+
+1. Clone the repository:
 ```bash
+git clone https://github.com/sindhu-satish/WhatTheFridge.git
+cd WhatTheFridge
+```
+
+2. Set up the backend:
+```bash
+# Create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows, use: venv\Scripts\activate
+
+# Install backend dependencies
+pip install -r requirements.txt
+
+# Create a .env file in the root directory with your OpenAI API key:
+echo "OPENAI_API_KEY=your_openai_api_key_here" > .env
+echo "USE_FAKE_RESPONSE=false > .env"
+echo "PORT=8000 > .env"
+echo "OPENAI_MODEL=gpt-4.1" >> .env
+echo "MAX_TOKENS=1000" >> .env
+```
+
+3. Set up the frontend:
+```bash
+# Navigate to the UI directory
 cd UI
+
+# Install frontend dependencies
 npm install
 ```
-4. Create a `.env` file with the following content:
-```
-# API Configuration
-PORT=8000
 
-# OpenAI API Configuration (REQUIRED)
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-4o-mini
-MAX_TOKENS=1000
-```
+## Running the Application
 
-5. Make sure to add your actual OpenAI API key in the `.env` file.
+You'll need to run both the backend and frontend services:
 
-## Running Locally
+### Start the Backend Server
 
-### Start the backend:
-
+In the root directory with your virtual environment activated:
 ```bash
+# From the root directory
 python app.py
 ```
+The backend API will be available at `http://localhost:8000/api`.
 
-The API will be available at `http://localhost:8000`.
+### Start the Frontend Development Server
 
-### Start the frontend:
-
-```bash 
+In a new terminal:
+```bash
+# Navigate to the UI directory
 cd UI
+
+# Start the development server
 npm run dev
 ```
+The frontend will be available at `http://localhost:8000`.
 
-The UI will be available at `http://localhost:5173`.
+## Using the Application
 
-## Deployment
-
-Due to size limitations with Vercel's serverless functions, we use a split deployment strategy:
-
-1. **Frontend**: Deploy the UI on Vercel
-2. **Backend**: Deploy the API on a platform like Render or Railway
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
+1. Open `http://localhost:8000` in your browser
+2. Upload an image of your fridge or food items using the upload button or drag-and-drop
+3. Wait for the AI to analyze the image and detect ingredients
+4. Select ingredients from the detected list
+5. Click "Get Recipe Recommendations" to receive recipe suggestions based on your selected ingredients
 
 ## API Endpoints
 
-### `POST /analyze-image`
-
-Upload an image and get ingredients analysis.
+### `POST /api/analyze-image`
+Analyzes an uploaded image and returns detected ingredients.
 
 **Request**: Multipart form data with an `image` field containing the image file.
 
-**Response**: JSON object with detected ingredients and specific quantities.
+**Response**: JSON object with detected ingredients and confidence scores.
 
-Example response:
-```json
-{
-  "ingredients": [
-    {
-      "name": "apple",
-      "confidence": 0.95,
-      "estimated_quantity": "3 apples"
-    },
-    {
-      "name": "milk",
-      "confidence": 0.87,
-      "estimated_quantity": "1 liter"
-    },
-    {
-      "name": "cheese",
-      "confidence": 0.92,
-      "estimated_quantity": "250g"
-    }
-  ],
-  "model_used": "gpt-4o-mini"
-}
-```
+### `POST /api/get-recipes`
+Gets recipe recommendations based on selected ingredients.
 
-## Testing the API
+**Request**: JSON object with an array of ingredients.
 
-You can test the API using cURL:
+**Response**: JSON object with recommended recipes.
 
+## Error Handling
+
+The application includes handling for:
+- Invalid image formats
+- Failed image uploads
+- API timeouts
+- No ingredients detected
+- Recipe recommendation failures
+
+## Development
+
+To run the application in development mode with hot reloading:
+
+1. Backend:
 ```bash
-curl -X POST -F "image=@/path/to/your/image.jpg" http://localhost:8000/analyze-image
+# From the root directory
+uvicorn app:app --reload
 ```
 
-Replace `/path/to/your/image.jpg` with the path to an actual image file. 
+2. Frontend:
+```bash
+# From the UI directory
+npm run dev
+```
