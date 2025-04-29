@@ -91,15 +91,9 @@ export function App() {
   
   const handleUploadClick = () => {
     if (fileInputRef.current) {
+      fileInputRef.current.value = ''; // Reset the input to allow selecting the same file again
       fileInputRef.current.click();
     }
-  };
-  
-  const startNewScan = () => {
-    setMessages([{
-      type: 'system',
-      content: 'Ready for a new scan! Upload another image of your fridge or food items.'
-    }]);
   };
   
   const renderMessageContent = (message: Message) => {
@@ -155,9 +149,6 @@ export function App() {
               </button>
             </div>
           </div>
-          {messages.length > 1 && <button onClick={startNewScan} className="mt-3 text-blue-500 text-sm hover:underline">
-              Start a new scan
-            </button>}
         </div>
       </main>
     </div>;

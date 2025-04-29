@@ -102,7 +102,48 @@ def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
                 "content": [
                     {
                         "type": "text",
-                        "text": "Analyze this image of food items. For each food item you detect, provide:\n1. The name of the food item\n2. An estimated quantity (e.g., '2 apples', '1 liter of milk')\n3. Your confidence level in the detection (0-1)\n\nFormat the response as a JSON object with an 'ingredients' array. Each ingredient should have 'name', 'estimated_quantity', and 'confidence' fields."
+                        "text": '''Analyze this image of food items. For each food item you detect, provide:
+                        1. The name of the food item
+                        2. An estimated quantity (e.g., '2 apples', '1 liter of milk')
+                        3. Your confidence level in the detection (0-1)
+                        Format the response as a JSON object with an 'ingredients' array. 
+                        Each ingredient should have 'name', 'estimated_quantity', and 'confidence' fields.
+                        
+                        If the item detected looks like     
+                            {
+                                "name": "Bell peppers",
+                                "estimated_quantity": "2 bell peppers (1 yellow, 1 red)",
+                                "confidence": 0.9
+                            },
+                        then the each item should be a separate ingredient, like this:
+                        ```json
+                        {
+                            "name": "Red bell peppers",
+                            "estimated_quantity": "1",
+                            "confidence": 0.9
+                        },
+                        {
+                            "name": "Yellow bell peppers",
+                            "estimated_quantity": "1",
+                            "confidence": 0.9
+                        }
+                        ```
+
+                        If the item detected looks like Condiment bottles (e.g., ketchup, 
+                        salad dressing), then each item should be a separate ingredient, like this:
+                        ```json
+                        {
+                            "name": "Ketchup",
+                            "estimated_quantity": "1",
+                            "confidence": 0.9
+                        },
+                        {
+                            "name": "Salad dressing",
+                            "estimated_quantity": "1",
+                            "confidence": 0.9
+                        }
+                        ```
+                        '''
                     },
                     {
                         "type": "image_url",
