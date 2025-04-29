@@ -30,7 +30,7 @@ export interface RecipeResponse {
 
 export async function analyzeImage(file: File): Promise<AnalysisResponse> {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('image', file);
 
   const response = await fetch(`${API_BASE_URL}/analyze-image`, {
     method: 'POST',
