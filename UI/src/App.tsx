@@ -85,14 +85,27 @@ export function App() {
       setMessages(prev => [...prev, {
         type: 'system',
         content: response
-      }, {
-        type: 'system',
-        content: 'Please select ingredients from above to get recipe recommendations. Or you can try another image.'
       }]);
+      
+      if (response.ingredients && response.ingredients.length === 0) {
+        setMessages(prev => [...prev, {
+          type: 'system',
+          content: "No ingredients were detected in the image. Please try uploading a clearer image or try again."
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          type: 'system',
+          content: 'Please select ingredients from above to get recipe recommendations. Or you can try another image.'
+        }]);
+      }
     } catch (error) {
+      const errorMessage = error instanceof Error && error.message.includes('timeout') 
+        ? "I was unable to reach OpenAI's servers. Please try again."
+        : `Error analyzing image: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      
       setMessages(prev => [...prev, {
         type: 'system',
-        content: `Error analyzing image: ${error instanceof Error ? error.message : 'Unknown error'}`
+        content: errorMessage
       }]);
     } finally {
       setIsLoading(false);
@@ -137,9 +150,13 @@ export function App() {
         }
       }]);
     } catch (error) {
+      const errorMessage = error instanceof Error && error.message.includes('timeout')
+        ? "I was unable to reach OpenAI's servers. Please try again."
+        : `Error getting recipes: ${error instanceof Error ? error.message : 'Unknown error'}`;
+
       setMessages(prev => [...prev, {
         type: 'system',
-        content: `Error getting recipes: ${error instanceof Error ? error.message : 'Unknown error'}`
+        content: errorMessage
       }]);
     } finally {
       setIsFetchingRecipes(false);
@@ -147,32 +164,41 @@ export function App() {
   };
   
   const renderMessageContent = (message: Message) => {
+    // Don't render anything if there's no content
+    if (!message.content) {
+      return null;
+    }
+
     if (typeof message.content === 'string') {
       if (message.content.startsWith('data:image')) {
         return <div className="max-w-sm overflow-hidden rounded-lg">
             <img src={message.content} alt="Uploaded food" className="w-full h-auto object-cover" />
           </div>;
       }
+      // Don't render empty strings
+      if (!message.content.trim()) {
+        return null;
+      }
       return <p className="text-sm">{message.content}</p>;
-    } else if (message.content.ingredients) {
+    } else if (message.content.ingredients && message.content.ingredients.length > 0) {
       return <div>
-          <IngredientsTable 
-            ingredients={message.content.ingredients} 
-            selectedIngredients={selectedIngredients}
-            onIngredientSelect={handleIngredientSelect}
-          />
-          {selectedIngredients.length > 0 && (
-            <button 
-              onClick={handleGetRecipes}
-              disabled={isFetchingRecipes}
-              className="mt-4 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center disabled:opacity-50"
-            >
-              <ChefHatIcon className="h-4 w-4 mr-2" />
-              {isFetchingRecipes ? 'Fetching Recipes...' : 'Get Recipe Recommendations'}
-            </button>
-          )}
-        </div>;
-    } else if (message.content.recipes) {
+        <IngredientsTable 
+          ingredients={message.content.ingredients} 
+          selectedIngredients={selectedIngredients}
+          onIngredientSelect={handleIngredientSelect}
+        />
+        {selectedIngredients.length > 0 && (
+          <button 
+            onClick={handleGetRecipes}
+            disabled={isFetchingRecipes}
+            className="mt-4 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center disabled:opacity-50"
+          >
+            <ChefHatIcon className="h-4 w-4 mr-2" />
+            {isFetchingRecipes ? 'Fetching Recipes...' : 'Get Recipe Recommendations'}
+          </button>
+        )}
+      </div>;
+    } else if (message.content.recipes && message.content.recipes.length > 0) {
       return <RecipesList recipes={message.content.recipes} />;
     }
     return null;
@@ -189,12 +215,21 @@ export function App() {
       </header>
       <main className="flex-1 overflow-hidden flex flex-col max-w-4xl w-full mx-auto p-4">
         <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-          {messages.map((message, index) => <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`rounded-xl p-4 max-w-[80%] shadow-sm
-                  ${message.type === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none'}`}>
-                {renderMessageContent(message)}
+          {messages.map((message, index) => {
+            const content = renderMessageContent(message);
+            // Don't render the message bubble if there's no content
+            if (!content) {
+              return null;
+            }
+            return (
+              <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`rounded-xl p-4 max-w-[80%] shadow-sm
+                    ${message.type === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none'}`}>
+                  {content}
+                </div>
               </div>
-            </div>)}
+            );
+          })}
           {isLoading && <div className="flex justify-start">
               <div className="rounded-xl p-4 bg-white text-gray-800 rounded-bl-none shadow-sm flex items-center space-x-2">
                 <Loader2Icon className="h-5 w-5 animate-spin text-blue-500" />
