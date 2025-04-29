@@ -108,7 +108,7 @@ def analyze_image_with_openai(image_bytes: bytes) -> Dict[str, Any]:
                         3. Your confidence level in the detection (0-1)
                         Format the response as a JSON object with an 'ingredients' array. 
                         Each ingredient should have 'name', 'estimated_quantity', and 'confidence' fields.
-                        
+                        Follow these rules:
                         If the item detected looks like     
                             {
                                 "name": "Bell peppers",

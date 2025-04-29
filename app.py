@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from services.image_analysis import analyze_image_with_openai
+from services.recipe_recommendation import get_recipe_recommendations
 import os
 import shutil
 from datetime import datetime
@@ -41,6 +42,9 @@ class AnalysisResponse(BaseModel):
     model_used: Optional[str] = None
     error: Optional[str] = None
 
+class RecipeRequest(BaseModel):
+    ingredients: List[Ingredient]
+
 @app.post("/api/analyze-image", response_model=AnalysisResponse)
 async def analyze_image(image: UploadFile = File(...)):
     try:
@@ -77,6 +81,23 @@ async def analyze_image(image: UploadFile = File(...)):
             error=str(e)
         )
         raise HTTPException(status_code=500, detail=error_response.dict())
+
+@app.post("/api/get-recipes")
+async def get_recipes(request: RecipeRequest):
+    try:
+        # Convert Pydantic model to dict for the recipe service
+        ingredients_dict = [ingredient.dict() for ingredient in request.ingredients]
+        result = get_recipe_recommendations(ingredients_dict)
+        return result
+    except Exception as e:
+        print(f"Error in get_recipes: {str(e)}")  # Add logging
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": str(e),
+                "message": "Failed to get recipe recommendations"
+            }
+        )
 
 app.mount("/", StaticFiles(directory="UI/dist", html=True), name="ui")
 

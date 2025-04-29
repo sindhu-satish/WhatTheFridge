@@ -13,6 +13,18 @@ export interface AnalysisResponse {
   error?: string;
 }
 
+export interface Recipe {
+  title: string;
+  ingredients: string[];
+  instructions: string[];
+  prepTime: string;
+  cookTime: string;
+}
+
+export interface RecipeResponse {
+  recipes: Recipe[];
+  error?: string;
+}
 
 export async function analyzeImage(imageFile: File): Promise<AnalysisResponse> {
   const formData = new FormData();
@@ -35,4 +47,20 @@ export async function analyzeImage(imageFile: File): Promise<AnalysisResponse> {
     console.error('API Error:', error);
     throw new Error(error instanceof Error ? error.message : 'Failed to analyze image');
   }
+}
+
+export async function getRecipes(ingredients: Ingredient[]): Promise<RecipeResponse> {
+  const response = await fetch(`${BASE_URL}/get-recipes`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ingredients }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to get recipes');
+  }
+
+  return response.json();
 } 

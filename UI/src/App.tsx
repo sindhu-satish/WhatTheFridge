@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { UploadIcon, SendIcon, ImageIcon, Loader2Icon } from 'lucide-react';
-import { analyzeImage, type AnalysisResponse, type Ingredient } from './services/api';
+import { UploadIcon, SendIcon, ImageIcon, Loader2Icon, ChefHatIcon } from 'lucide-react';
+import { analyzeImage, type AnalysisResponse, type Ingredient, getRecipes } from './services/api';
 
 type MessageContent = string | AnalysisResponse;
 
@@ -9,13 +9,20 @@ interface Message {
   content: MessageContent;
 }
 
+interface SelectedIngredient extends Ingredient {
+  selected: boolean;
+}
+
 export function App() {
   const [messages, setMessages] = useState<Message[]>([{
     type: 'system',
     content: "Welcome to WhatTheFridge! Upload an image of your fridge or food items, and I'll identify the ingredients for you."
   }]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingRecipes, setIsFetchingRecipes] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [selectedIngredients, setSelectedIngredients] = useState<SelectedIngredient[]>([]);
+  const [recipes, setRecipes] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -78,6 +85,9 @@ export function App() {
       setMessages(prev => [...prev, {
         type: 'system',
         content: response
+      }, {
+        type: 'system',
+        content: 'Please select ingredients from above to get recipe recommendations. Or you can try another image.'
       }]);
     } catch (error) {
       setMessages(prev => [...prev, {
@@ -96,6 +106,46 @@ export function App() {
     }
   };
   
+  const handleIngredientSelect = (ingredient: Ingredient) => {
+    setSelectedIngredients(prev => {
+      const existing = prev.find(i => i.name === ingredient.name);
+      if (existing) {
+        return prev.filter(i => i.name !== ingredient.name);
+      } else {
+        return [...prev, { ...ingredient, selected: true }];
+      }
+    });
+  };
+
+  const handleGetRecipes = async () => {
+    if (selectedIngredients.length === 0) {
+      setMessages(prev => [...prev, {
+        type: 'system',
+        content: 'Please select at least one ingredient to get recipe recommendations.'
+      }]);
+      return;
+    }
+
+    setIsFetchingRecipes(true);
+    try {
+      const recipeResponse = await getRecipes(selectedIngredients);
+      setRecipes(recipeResponse.recipes);
+      setMessages(prev => [...prev, {
+        type: 'system',
+        content: {
+          recipes: recipeResponse.recipes
+        }
+      }]);
+    } catch (error) {
+      setMessages(prev => [...prev, {
+        type: 'system',
+        content: `Error getting recipes: ${error instanceof Error ? error.message : 'Unknown error'}`
+      }]);
+    } finally {
+      setIsFetchingRecipes(false);
+    }
+  };
+  
   const renderMessageContent = (message: Message) => {
     if (typeof message.content === 'string') {
       if (message.content.startsWith('data:image')) {
@@ -105,7 +155,25 @@ export function App() {
       }
       return <p className="text-sm">{message.content}</p>;
     } else if (message.content.ingredients) {
-      return <IngredientsTable ingredients={message.content.ingredients} />;
+      return <div>
+          <IngredientsTable 
+            ingredients={message.content.ingredients} 
+            selectedIngredients={selectedIngredients}
+            onIngredientSelect={handleIngredientSelect}
+          />
+          {selectedIngredients.length > 0 && (
+            <button 
+              onClick={handleGetRecipes}
+              disabled={isFetchingRecipes}
+              className="mt-4 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center disabled:opacity-50"
+            >
+              <ChefHatIcon className="h-4 w-4 mr-2" />
+              {isFetchingRecipes ? 'Fetching Recipes...' : 'Get Recipe Recommendations'}
+            </button>
+          )}
+        </div>;
+    } else if (message.content.recipes) {
+      return <RecipesList recipes={message.content.recipes} />;
     }
     return null;
   };
@@ -133,6 +201,12 @@ export function App() {
                 <p className="text-sm">Analyzing your image...</p>
               </div>
             </div>}
+          {isFetchingRecipes && <div className="flex justify-start">
+              <div className="rounded-xl p-4 bg-white text-gray-800 rounded-bl-none shadow-sm flex items-center space-x-2">
+                <Loader2Icon className="h-5 w-5 animate-spin text-green-500" />
+                <p className="text-sm">Fetching recipes for the selected ingredients...</p>
+              </div>
+            </div>}
           <div ref={messagesEndRef} />
         </div>
         <div className="relative">
@@ -156,34 +230,92 @@ export function App() {
 
 interface IngredientsTableProps {
   ingredients: Ingredient[];
+  selectedIngredients: SelectedIngredient[];
+  onIngredientSelect: (ingredient: Ingredient) => void;
 }
 
-function IngredientsTable({ ingredients }: IngredientsTableProps) {
+function IngredientsTable({ ingredients, selectedIngredients, onIngredientSelect }: IngredientsTableProps) {
   return <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-100">
+            <th className="text-left py-2 px-3 font-medium">Select</th>
             <th className="text-left py-2 px-3 font-medium">Ingredient</th>
             <th className="text-left py-2 px-3 font-medium">Quantity</th>
             <th className="text-left py-2 px-3 font-medium">Confidence</th>
           </tr>
         </thead>
         <tbody>
-          {ingredients.sort((a, b) => b.confidence - a.confidence).map((ingredient, index) => <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+          {ingredients.sort((a, b) => b.confidence - a.confidence).map((ingredient, index) => {
+            const isSelected = selectedIngredients.some(i => i.name === ingredient.name);
+            return <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+              <td className="py-2 px-3">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onIngredientSelect(ingredient)}
+                  className="h-4 w-4 text-blue-500 rounded border-gray-300"
+                />
+              </td>
               <td className="py-2 px-3">{ingredient.name}</td>
               <td className="py-2 px-3">{ingredient.estimated_quantity}</td>
               <td className="py-2 px-3">
                 <div className="flex items-center">
                   <div className="w-full bg-gray-200 rounded-full h-1.5 mr-2">
                     <div className="bg-blue-500 h-1.5 rounded-full" style={{
-                  width: `${ingredient.confidence * 100}%`
-                }}></div>
+                      width: `${ingredient.confidence * 100}%`
+                    }}></div>
                   </div>
                   <span>{Math.round(ingredient.confidence * 100)}%</span>
                 </div>
               </td>
-            </tr>)}
+            </tr>;
+          })}
         </tbody>
       </table>
+    </div>;
+}
+
+interface Recipe {
+  title: string;
+  ingredients: string[];
+  instructions: string[];
+  prepTime: string;
+  cookTime: string;
+}
+
+interface RecipesListProps {
+  recipes: Recipe[];
+}
+
+function RecipesList({ recipes }: RecipesListProps) {
+  return <div className="space-y-4">
+      {recipes.map((recipe, index) => (
+        <div key={index} className="bg-white rounded-lg shadow-sm p-4">
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">{recipe.title}</h3>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <h4 className="font-medium text-gray-700 mb-1">Ingredients:</h4>
+              <ul className="list-disc list-inside text-sm text-gray-600">
+                {recipe.ingredients.map((ing, i) => (
+                  <li key={i}>{ing}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-700 mb-1">Instructions:</h4>
+              <ol className="list-decimal list-inside text-sm text-gray-600">
+                {recipe.instructions.map((step, i) => (
+                  <li key={i}>{step}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
+          <div className="flex space-x-4 text-sm text-gray-500">
+            <span>Prep: {recipe.prepTime}</span>
+            <span>Cook: {recipe.cookTime}</span>
+          </div>
+        </div>
+      ))}
     </div>;
 }
