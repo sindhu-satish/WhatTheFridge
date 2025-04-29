@@ -1,4 +1,6 @@
-const BASE_URL = 'http://0.0.0.0:8000/api';
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? '/api'  // In production, use relative path
+  : 'http://0.0.0.0:8000/api';  // In development, use full URL
 
 export interface Ingredient {
   name: string;
@@ -26,31 +28,24 @@ export interface RecipeResponse {
   error?: string;
 }
 
-export async function analyzeImage(imageFile: File): Promise<AnalysisResponse> {
+export async function analyzeImage(file: File): Promise<AnalysisResponse> {
   const formData = new FormData();
-  formData.append('image', imageFile);
+  formData.append('file', file);
 
-  try {
-    const response = await fetch(`${BASE_URL}/analyze-image`, {
-      method: 'POST',
-      body: formData,
-      credentials: 'include'
-    });
+  const response = await fetch(`${API_BASE_URL}/analyze-image`, {
+    method: 'POST',
+    body: formData,
+  });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to analyze image');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('API Error:', error);
-    throw new Error(error instanceof Error ? error.message : 'Failed to analyze image');
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
   }
+
+  return response.json();
 }
 
 export async function getRecipes(ingredients: Ingredient[]): Promise<RecipeResponse> {
-  const response = await fetch(`${BASE_URL}/get-recipes`, {
+  const response = await fetch(`${API_BASE_URL}/get-recipes`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -59,7 +54,7 @@ export async function getRecipes(ingredients: Ingredient[]): Promise<RecipeRespo
   });
 
   if (!response.ok) {
-    throw new Error('Failed to get recipes');
+    throw new Error(`HTTP error! status: ${response.status}`);
   }
 
   return response.json();
